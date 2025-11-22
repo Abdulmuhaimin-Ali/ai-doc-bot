@@ -1,0 +1,1 @@
+This file is used to test if docs are updated based on merged pull request.
