@@ -18,19 +18,40 @@ export default async function generateDocs(changedFiles) {
 }
 
 async function callAIToGenerateDoc(code, filename) {
-  const prompt = `
-Generate updated documentation for the following file: ${filename}.
+  try {
+    const prompt = `Generate documentation for the following code file ${filename}: \n\n${code}`;
 
-Here is the current content:
-${code}
-  `;
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": process.env.GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
+        }),
+      }
+    );
 
-  const response = await fetch(process.env.AI_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
+    if (!response.ok) {
+      throw new Error(`AI service responded with status ${response.status}`);
+    }
 
-  const data = await response.json();
-  return data.output;
+    const data = await response.json();
+
+    if (data.candidates && data.candidates[0]) {
+      return data.candidates[0].content.parts[0].text;
+    } else {
+      throw new Error("Unexpected response format from Gemini");
+    }
+  } catch (error) {
+    console.error("Error calling AI service:", error);
+    return `# Documentation Generation Failed\n\nError: ${error.message}`;
+  }
 }
