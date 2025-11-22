@@ -20,7 +20,12 @@ export default async function webhook(req, res) {
 
   const changedFiles = await extractChangedFiles(repoInfo);
 
-  await generateDocs(changedFiles);
-
-  res.status(200).send("Docs updated");
+  try {
+    const changedFiles = await extractChangedFiles(repoInfo);
+    await generateDocs(changedFiles);
+    res.status(200).send("Docs updated");
+  } catch (error) {
+    console.error("Webhook processing failed:", error);
+    res.status(500).send("Error processing webhook");
+  }
 }
