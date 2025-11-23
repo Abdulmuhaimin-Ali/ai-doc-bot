@@ -1,6 +1,7 @@
 import generateDocs from "./docGenerator.js";
 import { extractChangedFiles } from "./gitUtils.js";
 import { generateRepositoryOverview } from "./repoOverview.js";
+import { generateArchitectureFromOverview } from "./genArch.js";
 
 export default async function webhook(req, res) {
   const event = req.headers["x-github-event"];
@@ -28,6 +29,7 @@ export default async function webhook(req, res) {
     await generateDocs(changedFiles);
 
     await generateRepositoryOverview(repoInfo.repo);
+    await generateArchitectureFromOverview(repoInfo.repo);
 
     res.status(200).send("Docs updated");
   } catch (error) {
