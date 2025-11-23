@@ -24,5 +24,6 @@ build/
 
 # Generated documentation
 
+docs/ARCHITECTURE.md
 
 /src/generated/prisma
