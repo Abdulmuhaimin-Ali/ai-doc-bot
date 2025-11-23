@@ -18,3 +18,5 @@ test if architecture mermaid file gets generated with no errors.
 
 test archgen again 
 
+gemeni api limit throttle 
+
