@@ -1,110 +1,126 @@
-// Add this to your gitUtils.js or a new file
-async function scanRepositoryRecursively(contents, repo, path = "") {
-  let allFiles = [];
+import fs from "fs";
+import path from "path";
 
-  for (const item of contents) {
-    if (item.type === "file") {
-      allFiles.push({
-        path: item.path,
-        name: item.name,
-        download_url: item.download_url,
-      });
-    } else if (item.type === "dir") {
-      // Recursively scan subdirectories
-      const subdirUrl = `https://api.github.com/repos/${repo}/contents/${item.path}`;
-      const subdirResp = await fetch(subdirUrl, {
-        headers: {
-          Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          "User-Agent": "ai-doc-bot",
-        },
-      });
-      const subdirContents = await subdirResp.json();
-      const subdirFiles = await scanRepositoryRecursively(
-        subdirContents,
-        repo,
-        item.path
-      );
-      allFiles = allFiles.concat(subdirFiles);
-    }
-  }
+// Files/folders to ignore
+const IGNORED_PATTERNS = [
+  /node_modules/,
+  /\.git\//,
+  /dist\//,
+  /build\//,
+  /\.next\//,
+  /coverage\//,
+  /\.(jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$/i,
+  /package-lock\.json$/,
+  /yarn\.lock$/,
+  /\.env/,
+];
 
-  return allFiles;
+function shouldIncludeFile(filePath) {
+  return !IGNORED_PATTERNS.some((pattern) => pattern.test(filePath));
 }
 
 export async function generateRepositoryOverview(repo) {
   try {
-    const url = `https://api.github.com/repos/${repo}/contents`;
-    const resp = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-        "User-Agent": "ai-doc-bot",
-      },
+    const token = process.env.GITHUB_TOKEN;
+    const headers = {
+      "User-Agent": "ai-doc-bot",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+
+    // Get default branch
+    const repoResponse = await fetch(`https://api.github.com/repos/${repo}`, {
+      headers,
     });
+    const repoData = await repoResponse.json();
+    const defaultBranch = repoData.default_branch || "main";
 
-    if (!resp.ok) {
-      throw new Error(`GitHub API error: ${resp.statusText}`);
-    }
+    // Get tree SHA
+    const branchResponse = await fetch(
+      `https://api.github.com/repos/${repo}/branches/${defaultBranch}`,
+      { headers }
+    );
+    const branchData = await branchResponse.json();
+    const treeSha = branchData.commit.sha;
 
-    const contents = await resp.json();
-    const allFiles = await scanRepositoryRecursively(contents, repo);
+    // Get all files recursively
+    const treeResponse = await fetch(
+      `https://api.github.com/repos/${repo}/git/trees/${treeSha}?recursive=1`,
+      { headers }
+    );
+    const treeData = await treeResponse.json();
 
-    // Generate overview document
-    const overview = await generateOverviewDocument(allFiles, repo);
+    // Filter files
+    const files = treeData.tree
+      .filter((item) => item.type === "blob")
+      .filter((item) => shouldIncludeFile(item.path))
+      .map((item) => ({
+        path: item.path,
+        name: path.basename(item.path),
+      }));
 
+    console.log(`Found ${files.length} files`);
+
+    // Generate overview
+    const overview = await generateOverviewDocument(files, repo);
+
+    // Save to docs/OVERVIEW.md
     const overviewPath = path.join(process.cwd(), "docs", "OVERVIEW.md");
-    const docsDir = path.dirname(overviewPath);
-
-    if (!fs.existsSync(docsDir)) {
-      fs.mkdirSync(docsDir, { recursive: true });
-    }
-
     fs.writeFileSync(overviewPath, overview);
-    console.log(`✅ Repository overview generated: ${overviewPath}`);
 
-    return allFiles;
+    console.log(`Overview saved to docs/OVERVIEW.md`);
+    return files;
   } catch (error) {
-    console.error("Error generating repository overview:", error);
+    console.error("Error:", error.message);
     throw error;
   }
 }
 
 async function generateOverviewDocument(files, repo) {
-  const fileList = files.map((file) => `- \`${file.path}\``).join("\n");
+  const fileList = files.map((f) => `- \`${f.path}\``).join("\n");
 
-  const prompt = `
-Generate a comprehensive repository overview for: ${repo}
+  const prompt = `Generate a repository overview for: ${repo}
 
-Files in repository:
+Files (${files.length} total):
 ${fileList}
 
-Please provide:
+Provide:
 # Repository Overview
 
 ## Project Structure
-- Explain the overall architecture and folder structure
-
 ## Key Components
-- Identify main modules and their purposes
-
 ## Entry Points
-- Main application files and startup scripts
+## Technology Stack
+## Setup Instructions
 
-## Dependencies
-- What external libraries or services are used
+Format in markdown.`;
 
-## Development Guide
-- How to set up, build, and test the project
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-goog-api-key": process.env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+      }),
+    }
+  );
 
-Format in clear markdown with proper headings.
-`;
-
-  // Use your existing AI call function
-  const response = await fetch(process.env.AI_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
+  if (!response.ok) {
+    throw new Error(`Gemini API responded with status ${response.status}`);
+  }
 
   const data = await response.json();
-  return data.output;
+
+  if (data.candidates && data.candidates[0]) {
+    return data.candidates[0].content.parts[0].text;
+  } else {
+    throw new Error("Unexpected response format from Gemini");
+  }
 }
