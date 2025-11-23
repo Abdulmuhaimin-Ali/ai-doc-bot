@@ -39,18 +39,17 @@ export default async function generateDocs(changedFiles) {
 async function categorizeFile(code, filename) {
   try {
     const prompt = `
-  Analyze this code file and categorize it:
-  
+
   File: ${filename}
   code:
   ${code}
   
-  Categorize this into one of these categories:
+  Categorize this into one of the following categories:
    - business-logic
    - api-routes
    - database
-   
-   Return ONLY the category name, nothing else.
+
+   I just want you Return ONLY the category name from the list above, nothing else.
    `;
 
     const response = await fetch(
@@ -67,15 +66,33 @@ async function categorizeFile(code, filename) {
               parts: [{ text: prompt }],
             },
           ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 20,
+          },
         }),
       }
     );
 
     const data = await response.json();
-    console.log(data.candidates[0].content.parts[0].text);
-    const category = data.candidates[0].content.parts[0].text
+    const rawCategory = data.candidates[0].content.parts[0].text;
+    console.log("Raw AI response:", rawCategory);
+
+    // Clean up the response aggressively
+    const category = rawCategory
       .trim()
-      .toLowerCase();
+      .toLowerCase()
+      .replace(/[^a-z-]/g, "") // Remove everything except letters and hyphens
+      .split("\n")[0]; // Take only first line if multiple
+
+    // Validate against allowed categories
+    const validCategories = ["business-logic", "api-routes", "database"];
+    if (!validCategories.includes(category)) {
+      console.warn(
+        `Invalid category "${category}", defaulting to uncategorized`
+      );
+      return "uncategorized";
+    }
     return category;
   } catch (error) {
     console.error("Error categorizing file:", error);
@@ -84,9 +101,25 @@ async function categorizeFile(code, filename) {
 }
 
 // Helper function to call AI service
-async function callAIToGenerateDoc(code, filename) {
+async function callAIToGenerateDoc(code, filename, category) {
   try {
-    const prompt = `Generate documentation for the following code file ${filename}: \n\n${code}`;
+    const prompt = `
+Generate comprehensive documentation for this ${category} file: ${filename}
+
+Code:
+${code}
+
+Please provide:
+## Purpose & Overview
+## Key Functions/Components
+## Business Logic (if applicable)
+## Input/Output Specifications
+## Usage Examples
+## Dependencies
+## Important Notes
+
+Format in clear markdown with appropriate headers.
+`;
 
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
