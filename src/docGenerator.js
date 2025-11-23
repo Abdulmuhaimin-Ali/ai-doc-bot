@@ -72,8 +72,11 @@ async function categorizeFile(code, filename) {
     );
 
     const data = await response.json();
-    console.log(data);
-    return data.output.trim().toLowerCase();
+    console.log(data.candidates[0].content.parts[0].text);
+    const category = data.candidates[0].content.parts[0].text
+      .trim()
+      .toLowerCase();
+    return category;
   } catch (error) {
     console.error("Error categorizing file:", error);
     return "uncategorized";
