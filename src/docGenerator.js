@@ -7,7 +7,7 @@ export default async function generateDocs(changedFiles) {
   if (!fs.existsSync(docsBaseDir)) fs.mkdirSync(docsBaseDir);
 
   console.log(
-    "📁 Changed files:",
+    " Changed files:",
     changedFiles.map((f) => f.filename)
   );
 
@@ -28,11 +28,11 @@ export default async function generateDocs(changedFiles) {
 
     if (!fs.existsSync(docDir)) {
       fs.mkdirSync(docDir, { recursive: true });
-      console.log(`✅ Created directory: ${docDir}`);
+      console.log(` Created directory: ${docDir}`);
     }
 
     fs.writeFileSync(docPath, doc);
-    console.log(`✅ Documentation generated: ${docPath}`);
+    console.log(`  Documentation generated: ${docPath}`);
   }
 }
 

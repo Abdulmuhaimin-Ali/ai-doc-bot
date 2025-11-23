@@ -24,3 +24,5 @@ build/
 
 # Generated documentation
 docs/
+
+/src/generated/prisma
