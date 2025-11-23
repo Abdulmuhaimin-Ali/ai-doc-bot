@@ -23,6 +23,6 @@ build/
 .idea/
 
 # Generated documentation
-docs/
+
 
 /src/generated/prisma
