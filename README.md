@@ -28,7 +28,11 @@ Node.js, Express, Gemini API
 React, TypeScript, Tailwind *(still in development — I focused on the core functionality first)*
 
 **Deployment**  
-Vercel *(waitlist live)*
+Vercel
+
+## Getting Started
+
+**[Join the Waitlist](https://code-clarity-ai.vercel.app/)**
 
 ## What's Next
 
