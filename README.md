@@ -1,4 +1,4 @@
-# Code Clarity AI - HackWestern12
+# 🏆 Code Clarity AI - HackWestern12
 
 ## Overview
 
